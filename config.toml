@@ -1,0 +1,9 @@
+[test_table]
+greeting = "Hello there"
+response = "General Kenobi!"
+
+[search_engines]
+google = "https://www.google.com/search?q={}"
+wikipedia = "https://en.wikipedia.org/w/index.php?search={}"
+error404 = "https://doc.rust-lang.org/std/{}_ATTHEEND"
+nonexistant = "https://wadbnalkj{}dbalwdbhalhj.com/"

@@ -1,4 +1,5 @@
 .idea/
-config.toml
-/target
+/target/
+Cargo.lock
+
 **/*.rs.bk
