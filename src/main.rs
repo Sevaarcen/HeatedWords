@@ -1,85 +1,71 @@
-extern crate config;
-
 #[macro_use]
+#[allow(dead_code)]
+#[allow(unused_variables)]
+
 extern crate lazy_static;
+extern crate config;
+extern crate regex;
+extern crate reqwest;
+extern crate url;
 
-use std::env;
-use std::sync::RwLock;
-use config::Config;
 
+pub mod configuration;
 mod fetcher;
 mod parser;
+mod engine;
 
-// example websites to test this prototype
-// "https://en.wikipedia.org/wiki/List_of_professional_sports_teams_in_the_United_States_and_Canada"
-// "https://www.cbssports.com/college-football/teams/"
-
-lazy_static! {
-    static ref CONFIGURATION: RwLock<Config> = RwLock::new(Config::default());
-}
+use std::env;
+use url::percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 
 fn main() {
     //read configuration file into the Config
-    match CONFIGURATION.write() {
-        Ok(mut config_file) => {
-            config_file.merge(config::File::with_name("config.toml")).unwrap();
-            ()
-        }
-        Err(e) => panic!("Error loading configuration file in main: {}", e)
-    }
-
-//    match CONFIGURATION.read() {
-//        Ok(config_file) => {
-//            println!("{}", config_file.get::<String>("test_table.greeting").unwrap());
-//            println!("{}", config_file.get::<String>("test_table.response").unwrap());
-//
-//            let cmap = config_file.get_table("test_table").unwrap();
-//            println!("{}", cmap.get("greeting").unwrap());
-//            println!("{}", cmap.get("response").unwrap());
-//        }
-//        Err(e) => panic!("Error reading configuration file in main: {}", e)
-//    }
+    configuration::load_configuration_file();
 
     //handle arguments
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        panic!("You must specify a search query. You only specified {} arguments", args.len());
+        panic!("You must specify a search query as an argument (e.g. \"College football teams\").");
     }
 
-    let engines: Vec<String> = match CONFIGURATION.read() {
-        Ok(config_file) => {
-            config_file
-                .get_table("search_engines")
-                .unwrap()
-                .into_iter()
-                .map(|(_, value)| value.into_str().unwrap().clone())
-                .collect()
-        }
-        Err(e) => panic!("Error reading the search base URLs from configuration file : {}", e)
-    };
+    //build search engines from config file that we loaded earlier
+    let engines = engine::build_engines();
 
-    let search_string = args[1].clone();
-
-    let search_results = fetcher::search(&engines, &search_string);
-    for result in search_results {
-        match result {
-            Ok((url, mut response)) => {
-                println!("Suceeded in GET request to: {}", url);
-
-                let word_list = parser::parse(&mut response);
-
-                println!("Wordlist contains {} critical words", word_list.0.len());
-                println!("Wordlist contains {} individual words", word_list.1.len());
-                for word in word_list.0 {
-                    println!("<|[{}]|> => {}", url, word);
-                }
-                for word in word_list.1 {
-                    if word.len() > 4 {
-                        println!("[{}] -> {}", url, word);
-                    }
-                }
-            }
-            Err(e) => eprintln!("Failed GET request: {}", e)
-        }
+    println!("Using the following search engines: ");
+    for engine in &engines {
+        println!("{}", engine);
     }
+
+    // handle CLI arguments
+    let search_string = args[1].as_str();
+    let query = utf8_percent_encode(search_string, DEFAULT_ENCODE_SET).to_string();
+
+    println!("Dispatching...");
+    for engine in &engines {
+        engine.dispatch(&query.as_str());
+    }
+
+
+
+//    let search_results = fetcher::search(&engines, &search_string);
+//    for result in search_results {
+//        match result {
+//            Ok((url, mut response)) => {
+//                println!("Suceeded in GET request to: {}", url);
+//
+//                let word_list = parser::parse(&mut response);
+//
+//                println!("Wordlist contains {} critical words", word_list.0.len());
+//                println!("Wordlist contains {} individual words", word_list.1.len());
+//                for word in word_list.0 {
+//                    println!("<|[{}]|> => {}", url, word);
+//                }
+//                for word in word_list.1 {
+//                    if word.len() > 4 {
+//                        println!("[{}] -> {}", url, word);
+//                    }
+//                }
+//            }
+//            Err(e) => eprintln!("Failed GET request: {}", e)
+//        }
+//    }
 }

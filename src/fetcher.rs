@@ -1,6 +1,3 @@
-extern crate reqwest;
-extern crate url;
-
 use url::percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 
 pub fn search(engines: &Vec<String>, query: &str) -> Vec<Result<(String, String), String>> {
@@ -17,7 +14,6 @@ pub fn search(engines: &Vec<String>, query: &str) -> Vec<Result<(String, String)
 
     responses
 }
-//TODO make it so search just handles the responses which are sent to another handler to query the links!
 
 pub fn make_request(url: &str) -> Result<(String, String), String> {
 

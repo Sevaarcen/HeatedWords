@@ -1,5 +1,3 @@
-extern crate regex;
-
 use regex::Regex;
 
 pub fn parse(response_text: &mut String) -> (Vec<String>, Vec<String>) {

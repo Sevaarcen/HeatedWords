@@ -1,9 +1,11 @@
-[test_table]
-greeting = "Hello there"
-response = "General Kenobi!"
+debug = false
 
-[search_engines]
-google = "https://www.google.com/search?q={}"
-wikipedia = "https://en.wikipedia.org/w/index.php?search={}"
-error404 = "https://doc.rust-lang.org/std/{}_ATTHEEND"
-nonexistant = "https://wadbnalkj{}dbalwdbhalhj.com/"
+[engines]
+
+[engines.google]
+url = "https://www.google.com/search?q={}" # "{}" gets substituted for the query
+regex = '<h3 class="r"><a href="/url\?q={}&amp;' # "{}" gets susbtituted for the regex extracting the link itself (lazy)
+
+[engines.wikipedia]
+url = "https://en.wikipedia.org/w/index.php?search={}!" # has a "!" at the end so it won't match a wiki page exactly
+regex = '''<div class='mw-search-result-heading'><a href="{}['"][ >]''' #multiline so we can use '
