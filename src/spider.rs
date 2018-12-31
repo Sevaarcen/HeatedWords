@@ -1,59 +1,54 @@
-// https://github.com/sebasmagri/rust-concurrency-patterns/tree/master/examples
-
-
-use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
+use std::sync::mpsc::Receiver;
+use std::thread;
 
-use super::parser;
+use super::fetcher::Fetcher;
 
-//a Spider is a producer
-#[derive(Clone, Debug)]
-struct Spider {
-    id: String,
-    url: String,
-    master_rx: Arc<Mutex<mpsc::Receiver<usize>>>
-}
-
-impl fmt::Display for Spider {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Spider {}", self.id, self.url)
-    }
+#[derive(Debug)]
+pub struct Spider {
+    link_vector: Vec<String>
 }
 
 impl Spider {
-    fn new(id: String, url: String, master_rx: Arc<Mutex<mpsc::Receiver<usize>>>) -> Spider {
+    pub fn new(link_vector: Vec<String>) -> Spider {
         Spider {
-            id,
-            url,
-            master_rx
+            link_vector
         }
     }
 
-    pub fn dispatch(&self) {
-        println!("{} dispatched to retrieve {}", self, self.url);
+    pub fn dispatch(&mut self) -> Vec<String> {
+        println!("### - Spider dispatched");
 
-        //query URL
-        //get result
-        //parse
-        //feed to master
+        println!("### - Spider is now dispatching fetchers...");
+        //create workers and the master receiver
+        let (spider_rx, fetchers) = self.build_fetchers();
+        //start workers
+        for mut fetcher in fetchers {
+            thread::spawn(move || {
+                fetcher.dispatch();
+            });
+        }
+
+        println!("### - Spider is now receiving results from the Fetchers");
+        let mut results = Vec::new();
+        for received in spider_rx {
+            results.push(received);
+        }
+        println!("$$$ - Spider has retrieved all values from workers");
+
+        results
     }
 
-    fn get_url(&self) -> Result<String, String> {
-        match reqwest::get(url) {
-            Ok(mut response) => {
-                if response.status()  == reqwest::StatusCode::OK {
-                    match response.text() {
-                        Ok(text) => {
-                            Ok(text)
-                        },
-                        Err(e) => Err(format!("{} encountered an error: {}", self, e))
-                    }
-                }
-                else{
-                    Err(format!("{} failed to GET \"{}\" and received status code {}", self, url, response.status()))
-                }
-            },
-            Err(e) => Err(format!("{} failed to GET \"{}\": {}", self, url, e))
+    fn build_fetchers(&mut self) -> (Receiver<String>, Vec<Fetcher>) {
+        let mut fetchers = Vec::new();
+        let (tx, rx) = mpsc::channel();
+        let master_rx = rx;
+        let slave_tx = Arc::new(Mutex::new(tx));
+        for link in &self.link_vector {
+            fetchers.push(Fetcher::new(link.clone(),
+                                       slave_tx.clone())
+            );
         }
+        (master_rx, fetchers)
     }
 }

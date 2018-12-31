@@ -17,25 +17,23 @@ pub fn parse(response_text: &mut String) -> (Vec<String>, Vec<String>) {
 fn find_critical_words(response_text: &String) -> Vec<String> {
     let cap_rex = Regex::new(r"(?P<cap>(?:[A-Z][\w]*)(?:[ \-]?[A-Z][\w]*)*)").unwrap();
 
-    let mut result : Vec<String> = Vec::new();
+    let mut result: Vec<String> = Vec::new();
 
-    for capture in cap_rex.captures_iter(response_text)
-        .filter(|cap| cap.get(0).unwrap().as_str().len() > 4)
-        {
-            //for every capture (many contain multiple words), pull out the words
-            let word_rex = Regex::new(r"[a-zA-Z]+").unwrap();
-            //collect them into a vector
-            let word_vector = word_rex.captures_iter(&capture[0])
-                .map(|cap| cap.get(0).unwrap().as_str().to_string())
-                .collect();
+    for capture in cap_rex.captures_iter(response_text) {
+        //for every capture (many contain multiple words), pull out the words
+        let word_rex = Regex::new(r"[a-zA-Z]+").unwrap();
+        //collect them into a vector
+        let word_vector = word_rex.captures_iter(&capture[0])
+            .map(|cap| cap.get(0).unwrap().as_str().to_string())
+            .collect();
 
-            //and find all the slices
-            let variations = get_all_slices(&word_vector);
+        //and find all the slices
+        let variations = get_all_slices(&word_vector);
 
-            for variant in variations {
-                result.push(variant);
-            }
+        for variant in variations {
+            result.push(variant);
         }
+    }
 
     result
 }
