@@ -53,6 +53,8 @@ pub fn finish_wordlist(end_list: &mut Vec<String>) {
         }
     }
 
+    println!("$$$ - wordlist was finalized to length {}", end_list.len());
+
     //then write to file
     match configuration::CONFIGURATION.read() {
         Ok(config) => {

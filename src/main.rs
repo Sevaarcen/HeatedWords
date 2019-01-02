@@ -84,11 +84,9 @@ fn main() {
             println!("### - Finalizing results...");
             finalizer::finish_link_vector(list.to_vec()); //handles how the link vector should be handled
             finalizer::finish_wordlist(&mut results); //handles cleanup, final parsing, and post-processing
-            println!("$$$ - Done");
 
             println!("### - Executing post-processing...");
             finalizer::run_post_processing();
-            println!("$$$ - Done");
 
             println!("-=<|[[[ HEATED WORDS COMPLETED ]]]|>=-");
         },
