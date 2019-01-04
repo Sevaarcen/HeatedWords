@@ -95,7 +95,7 @@ pub fn run_post_processing() {
 
                         match run_process(table) {
                             Ok(output) => {
-                                println!("{}", output)
+                                println!("{}", output.trim())
                             }
                             Err(e) => println!("{}", e)
                         }
