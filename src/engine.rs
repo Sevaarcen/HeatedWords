@@ -33,7 +33,13 @@ impl Engine {
         }
     }
 
-    pub fn dispatch(&self, query: &str) -> Result<Vec<String>, String> {
+    pub fn dispatch(&self) -> Result<Vec<String>, String> {
+        let query_as_string = match configuration::CONFIGURATION.read().unwrap().get_str("query") {
+            Ok(result) => result.clone(),
+            Err(e) => panic!("Could not read query from configuration: {}", e)
+        };
+        let query = query_as_string.as_str();
+
         println!("### - {} dispatched with query: {}", self, query);
         let encoded_query = utf8_percent_encode(query, DEFAULT_ENCODE_SET).to_string();
         let url = self.base_url.as_str().replace("{}", encoded_query.as_str());
@@ -97,17 +103,17 @@ impl Engine {
     fn extract_links(&self, search_results: String) -> Vec<String> {
         let links =
             self.link_regex
-            .captures_iter(search_results.as_str())
-            .map(|cap| match self.base_url.join(cap.name("link").unwrap().as_str()) { //try joining the link with the base_url
-                Ok(full_url) => {
-                    if configuration::read_debug() {
-                        println!("RL: {}", cap.name("link").unwrap().as_str());
-                    }
-                    full_url.to_string()
-                } //if sucessful, the link was relative
-                Err(_) => cap.name("link").unwrap().as_str().to_string(), //otherwise its absolute and can be returned
-            })
-            .collect();
+                .captures_iter(search_results.as_str())
+                .map(|cap| match self.base_url.join(cap.name("link").unwrap().as_str()) { //try joining the link with the base_url
+                    Ok(full_url) => {
+                        if configuration::read_debug() {
+                            println!("RL: {}", cap.name("link").unwrap().as_str());
+                        }
+                        full_url.to_string()
+                    } //if sucessful, the link was relative
+                    Err(_) => cap.name("link").unwrap().as_str().to_string(), //otherwise its absolute and can be returned
+                })
+                .collect();
 
         links
     }
@@ -119,12 +125,10 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
 
     let min_match_threshold = match
         configuration::CONFIGURATION
-        .read()
-        .unwrap()
-        .get_float("sensitivity.match_threshold") {
-        Ok(value) => {
-            value
-        }
+            .read()
+            .unwrap()
+            .get_float("sensitivity.match_threshold") {
+        Ok(value) => value,
         Err(_) => {
             println!("!!! - Could not read value of \"sensitivity.match_threshhold\". Defaulting to 0.00");
             0.00
@@ -132,19 +136,32 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
     };
     let max_extra_threshold = match
         configuration::CONFIGURATION
-        .read()
-        .unwrap()
-        .get_float("sensitivity.extra_threshold") {
-        Ok(value) => {
-            value
-        }
+            .read()
+            .unwrap()
+            .get_float("sensitivity.extra_threshold") {
+        Ok(value) => value,
         Err(_) => {
             println!("!!! - Could not read value of \"sensitivity.extra_threshold\". Defaulting to 1.00");
             1.00
         }
     };
-    println!("### - Filtering links where the match ratio is less than {:.2} \
-    and ratio of extra words is more than {:.2}", min_match_threshold, max_extra_threshold);
+    let required_words = match
+        configuration::CONFIGURATION
+            .read()
+            .unwrap()
+            .get_array("required_words") {
+        Ok(value) => value,
+        Err(_) => Vec::new()
+    };
+    let excluded_words = match
+        configuration::CONFIGURATION
+            .read()
+            .unwrap()
+            .get_array("exclude words") {
+        Ok(value) => value,
+        Err(_) => Vec::new()
+    };
+
 
     links.retain(|link| {
         if configuration::read_debug() {
@@ -152,17 +169,44 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             println!("Link text: {:?}", link);
             println!("Words in query: {:?}",
                      alphanumeric_rex
-                     .captures_iter(query)
-                     .map(|cap| cap.get(0).unwrap().as_str().to_string())
-                     .collect::<Vec<String>>());
+                         .captures_iter(query)
+                         .map(|cap| cap.get(0).unwrap().as_str().to_string())
+                         .collect::<Vec<String>>());
+            println!("Required words: {:?}", required_words);
             println!("Words in link page: {:?}",
                      alphanumeric_rex
-                     .captures_iter(page_rex.captures(link).unwrap().name("page").unwrap().as_str())
-                     .map(|cap| cap.get(0).unwrap().as_str().to_string())
-                     .collect::<Vec<String>>());
+                         .captures_iter(page_rex.captures(link).unwrap().name("page").unwrap().as_str())
+                         .map(|cap| cap.get(0).unwrap().as_str().to_string())
+                         .collect::<Vec<String>>());
         }
 
         let link_path = page_rex.captures(link.as_str()).unwrap().name("page").unwrap().as_str();
+
+        //make sure link contains required words
+        for required in required_words.to_owned() {
+            match required.into_str() {
+                Ok(string) => {
+                    //if required word isn't in link
+                    if !link_path.to_lowercase().as_str().contains(string.to_lowercase().as_str()) {
+                        return false; //returns to retains method call up top
+                    }
+                }
+                Err(e) => println!("!!! - malformed required word isn't a string: {}", e)
+            }
+        }
+
+        //make sure link doesn't include excluded words
+        for excluded in excluded_words.to_owned() {
+            match excluded.into_str() {
+                Ok(string) => {
+                    //if required word isn't in link
+                    if link_path.to_lowercase().as_str().contains(string.to_lowercase().as_str()) {
+                        return false; //returns to retains method call up top
+                    }
+                }
+                Err(e) => println!("!!! - malformed excluded word isn't a string: {}", e)
+            }
+        }
 
         let mut match_counter: usize = 0;
         let mut not_match_counter: usize = 0;
@@ -222,8 +266,8 @@ pub fn build_engines() -> Vec<Engine> {
                     for table
                         in
                         table_list
-                        .values()
-                        .map(|table| table.clone().into_table().unwrap())
+                            .values()
+                            .map(|table| table.clone().into_table().unwrap())
                         {
                             engines.push(
                                 Engine::new(

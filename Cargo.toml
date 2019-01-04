@@ -1,6 +1,6 @@
 [package]
-name = "HeatedWords"
-version = "0.4.2"
+name = "heated_words"
+version = "0.5.0"
 authors = ["Sevaarcen <coleipod@gmail.com>"]
 edition = "2018"
 
@@ -10,3 +10,4 @@ url = "1.7.2"
 regex = "1.1.0"
 config = "0.9.1"
 lazy_static = "1.2.0"
+clap = "2.32.0"

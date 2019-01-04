@@ -45,7 +45,7 @@ fn get_all_slices(vector: &Vec<String>) -> Vec<String> {
         for end in begin..vector.len() { //vector.len()
             let mut perm = String::new();
             for value in &vector[begin..end + 1] { //end+1 so it includes the end
-                perm = format!("{}{}", perm, *value)
+                perm = format!("{} {}", perm, *value)
             }
             perms.push(perm.to_string().clone());
         }

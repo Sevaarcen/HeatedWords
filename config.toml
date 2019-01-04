@@ -2,9 +2,9 @@ debug = false
 
 # settings to change what links are processed for the wordlist
 [sensitivity]
-max_links = 50 #max links returned by each engine. -1 for unlimited
+max_links = 6 #max links returned by each engine. -1 for unlimited
 match_threshold = 0.60 # N percent of the words in the query should match the link
-extra_threshold = 0.70 # max N percent of the words in the link that doesn't match a word in the query
+extra_threshold = 0.80 # max N percent of the words in the link that doesn't match a word in the query
 
 [filenames]
 links = "links.txt"
@@ -17,7 +17,7 @@ wordlist = "wordlist.txt"
 
     [engines.wikipedia]
     url = "https://en.wikipedia.org/w/index.php?search={}!" # has a "!" at the end so it won't match a wiki page exactly
-    regex = '''<div class='mw-search-result-heading'><a href="{}['"][ >]''' #multiline so we can use '
+    regex = '''<div class='mw-search-result-heading'><a href="{}['"][ >]''' #multiline so we can use the ' character
 
 #currently there is no interface directly from this program to another one
 #data must be collected from the files themselves, which will be written before post-processing is run

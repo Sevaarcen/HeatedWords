@@ -8,7 +8,7 @@ use std::process::Command;
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 
-const CHARACTER_LIMIT_MAX: usize = 10; //inclusive
+const CHARACTER_LIMIT_MAX: usize = 12;//inclusive
 const CHARACTER_LIMIT_MIN: usize = 6; //inclusive
 
 pub fn finish_link_vector(link_vector: Vec<String>) {
@@ -39,7 +39,7 @@ pub fn finish_link_vector(link_vector: Vec<String>) {
 
 pub fn finish_wordlist(end_list: &mut Vec<String>) {
     println!("!!! - finalizing wordlist of length {}", end_list.len());
-    end_list.retain(|s| s.len()<= CHARACTER_LIMIT_MAX && s.len() >= CHARACTER_LIMIT_MIN);
+    end_list.retain(|s| s.len() <= CHARACTER_LIMIT_MAX && s.len() >= CHARACTER_LIMIT_MIN);
 
     // dedup
     for start in 0..end_list.len() {
@@ -85,10 +85,11 @@ pub fn run_post_processing() {
         Ok(config) => {
             match config.get_table("post-processing") {
                 Ok(table_list) => {
-                    for table in table_list
-                        .values()
-                        .map(|table| table.clone().into_table().unwrap()) {
-
+                    for table
+                        in
+                        table_list
+                            .values()
+                            .map(|table| table.clone().into_table().unwrap()) {
                         if configuration::read_debug() {
                             println!("{:?}", table);
                         }
@@ -126,11 +127,11 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
                         Ok(args) => {
                             for arg in args {
                                 match arg.to_owned().into_str() {
-                                    Ok(arg_str) =>  command.arg(arg_str),
+                                    Ok(arg_str) => command.arg(arg_str),
                                     Err(e) => return Err(format!("!!! - arg {} could not be converted into a string: {}", arg, e))
                                 };
                             }
-                        },
+                        }
                         Err(e) => return Err(format!("!!! - \"args\" exists but its value is malformed (it should be an array): {}", e))
                     }
                     None => return Err(format!("!!! - \"args\" key not found in table"))
@@ -148,7 +149,7 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
                     }
                     Err(e) => Err(format!("!!! - Post-process failed to execute: {}", e))
                 }
-            },
+            }
             Err(e) => Err(format!("!!! - \"command\" exists but its value is malformed: {}", e))
         }
         None => Err(format!("!!! - \"command\" key not found in table"))
