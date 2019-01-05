@@ -6,10 +6,10 @@ Use my other program "[Common Words Generator](https://github.com/Sevaarcen/Comm
 ## Features
 * Concurrent IO for network operations
 * Save settings in between runs via the Configuration file (config.toml)
+* Extensive Command Line support to change the behavior of the individual execution
 * Built in modular support for nearly any type of post-processing  
 
 ## Upcoming features
-* Better interactivity with CLI
 * Amazon Alexa support
 * Build in HashCat rule generator
 * Higher accuracy and precision
