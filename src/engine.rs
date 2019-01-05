@@ -164,9 +164,53 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
 
 
     links.retain(|link| {
+        let query_word_count = alphanumeric_rex.captures_iter(query).count();
+        let page_word_count = match page_rex.captures(link.as_str()) {
+            Some(page_cap) => {
+                alphanumeric_rex
+                    .captures_iter(page_cap.name("page").unwrap().as_str())
+                    .count()
+            },
+            None => 0
+        };
+
+        //check to see if the counts should cause a bypass
+        //bypass if the page doesn't have a path
+        if page_word_count == 0 {
+            if configuration::read_debug() {
+                println!("### - {} bypassed QA due to not having a page name", link);
+            }
+            return true //assume if the page doesn't have a name its a dedicate site (good)
+        }
+
+        let bypass_limit =
+            match configuration::CONFIGURATION.read()
+                .unwrap()
+                .get_int("sensitivity.word_bypass_limit") {
+                Ok(value) => value as usize,
+                Err(_) => {
+                    println!("!!! - No word bypass limit specified, defaulting to 0");
+                    0
+                }
+            };
+        if configuration::read_debug() {
+            println!("### -Using word bypass limit of: {}", bypass_limit);
+        }
+        //check if link should be bypassed due to low word count
+        if page_word_count <= bypass_limit && page_word_count < query_word_count {
+            if configuration::read_debug() {
+                println!("### -{:?} bypassed QA due to the word requirement", link);
+            }
+            return true;
+        }
+
+        //since length was checked beforehand, we guarantee that unwrapping it is safe
+        let link_path = page_rex.captures(link.as_str()).unwrap().name("page").unwrap().as_str();
+
         if configuration::read_debug() {
             println!("--- EVALUATING NEW LINK ---");
             println!("Link text: {:?}", link);
+            println!("Page text: {:?}", link_path);
             println!("Words in query: {:?}",
                      alphanumeric_rex
                          .captures_iter(query)
@@ -183,16 +227,6 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             };
             println!("Words in link page: {:?}", words_in_page);
         }
-
-        let link_path = match page_rex.captures(link.as_str()) {
-            Some(capture) => capture.name("page").unwrap().as_str(),
-            None => {
-                if configuration::read_debug() {
-                    println!("### - {} short-circuited due to not having a page name", link);
-                }
-                return true //assume if the page doesn't have a name its a dedicate site (good)
-            }
-        };
 
         //make sure link contains required words
         for required in required_words.to_owned() {

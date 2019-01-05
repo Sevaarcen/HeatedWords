@@ -68,7 +68,7 @@ fn main() {
                 .long("require")
                 .value_name("WORD")
                 .help("Specify a word which must exist in the URL (minus domain) \
-                for it to be valid")
+                for it to be valid. Can be used multiple times!")
             )
             .arg(Arg::with_name("exclude words")
                 .multiple(true)
@@ -76,7 +76,7 @@ fn main() {
                 .long("exclude")
                 .value_name("WORD")
                 .help("Specify a word which must NOT exist in the URL (minus domain) \
-                for it to be valid")
+                for it to be valid. Can be used multiple times!")
             )
             .arg(Arg::with_name("number of links")
                 .short("n")
@@ -84,6 +84,12 @@ fn main() {
                 .value_name("MAX")
                 .help("Specify the maximum number of links each Engine will return. \
                 -1 is unlimited.")
+            )
+            .arg(Arg::with_name("word bypass limit")
+                .long("bypass-limit")
+                .value_name("COUNT")
+                .help("Specify the limit of words in the URL (minus domain) \
+                that can cause a QA bypass")
             )
             .arg(Arg::with_name("match ratio")
                 .long("match-ratio")
@@ -144,10 +150,22 @@ fn main() {
     match arguments.value_of("number of links") {
         Some(value) => {
             match value.parse::<i64>() {
-                Ok(threshold) => {
-                    arg_config.set("sensitivity.max_links", threshold).unwrap();
+                Ok(count) => {
+                    arg_config.set("sensitivity.max_links", count).unwrap();
                 }
                 Err(e) => println!("!!! Match Ratio threshold is an invalid integer.\
+                Program will fall back to config file: {}", e)
+            }
+        }
+        None => ()
+    }
+    match arguments.value_of("word bypass limit") {
+        Some(value) => {
+            match value.parse::<f64>() {
+                Ok(count) => {
+                    arg_config.set("sensitivity.word_bypass_limit", count).unwrap();
+                }
+                Err(e) => println!("!!! Match Ratio threshold is an invalid float.\
                 Program will fall back to config file: {}", e)
             }
         }

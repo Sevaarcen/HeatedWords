@@ -4,7 +4,8 @@ debug = false
 [sensitivity]
 max_links = 6 #max links returned by each engine. -1 for unlimited
 match_threshold = 0.60 # N percent of the words in the query should match the link
-extra_threshold = 0.80 # max N percent of the words in the link that doesn't match a word in the query
+extra_threshold = 0.80 # max N percent of the words in the link that doesn't match any word in the query
+word_bypass_limit = 2 # If the number of words in the page URL is less than to the number of words in the query and less than/equal this, it will bypass the QA check
 
 [filenames]
 links = "links.txt"
@@ -13,7 +14,7 @@ wordlist = "wordlist.txt"
 [engines]
     [engines.google]
     url = "https://www.google.com/search?q={}" # "{}" gets substituted for the query
-    regex = '<h3 class="r"><a href="/url\?q={}&amp;' # "{}" gets susbtituted for the regex extracting the link itself (lazy)
+    regex = '<h3 class="r"><a href="/url\?q={}&amp;' # "{}" gets susbtituted for the regex (lazy) extracting the link itself
 
     [engines.wikipedia]
     url = "https://en.wikipedia.org/w/index.php?search={}!" # has a "!" at the end so it won't match a wiki page exactly
