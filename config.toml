@@ -23,22 +23,6 @@ wordlist = "wordlist.txt"
 #data must be collected from the files themselves, which will be written before post-processing is run
 [post-processing]
     [post-processing.test]
-    description = "tests post-processing functionality"
+    description = "post-processing functionality test" #optional key
     command = "cmd"
-    args = ["/C", "echo Hello there from post-processing as defined in config.toml!"]
-
-    [post-processing.pwd]
-    description = "print working directory"
-    command = "pwd"
-
-    #this suceeds because "description" is optional
-    #[post-processing.malformed1]
-    #desc = "bad desc"
-    #command = "cmd"
-    #args = ["/C", "echo", "malformed commands might still work!"]
-
-    #this would fail outright
-    #[post-processing.malformed2] #this fails
-    #description = "bad boii!!!!"
-    #command = "ljkaibesfkljhbwaekjfhbakj"
-    #args = []
+    args = ["/C", "echo Hello there from post-processing as defined in config.toml!"] #optional key, but typically always needed

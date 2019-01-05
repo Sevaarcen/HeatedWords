@@ -173,14 +173,26 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
                          .map(|cap| cap.get(0).unwrap().as_str().to_string())
                          .collect::<Vec<String>>());
             println!("Required words: {:?}", required_words);
-            println!("Words in link page: {:?}",
-                     alphanumeric_rex
-                         .captures_iter(page_rex.captures(link).unwrap().name("page").unwrap().as_str())
-                         .map(|cap| cap.get(0).unwrap().as_str().to_string())
-                         .collect::<Vec<String>>());
+            let words_in_page = match page_rex.captures(link.as_str()) {
+                Some(page_cap) =>
+                    alphanumeric_rex
+                        .captures_iter(page_cap.name("page").unwrap().as_str())
+                        .map(|cap| cap.get(0).unwrap().as_str().to_string())
+                        .collect::<Vec<String>>(),
+                None => return true //assume if the page doesn't have a name its a good match
+            };
+            println!("Words in link page: {:?}", words_in_page);
         }
 
-        let link_path = page_rex.captures(link.as_str()).unwrap().name("page").unwrap().as_str();
+        let link_path = match page_rex.captures(link.as_str()) {
+            Some(capture) => capture.name("page").unwrap().as_str(),
+            None => {
+                if configuration::read_debug() {
+                    println!("### - {} short-circuited due to not having a page name", link);
+                }
+                return true //assume if the page doesn't have a name its a dedicate site (good)
+            }
+        };
 
         //make sure link contains required words
         for required in required_words.to_owned() {

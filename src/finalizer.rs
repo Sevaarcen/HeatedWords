@@ -161,23 +161,26 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
     match table.get("command") {
         Some(value) => match value.to_owned().into_str() {
             Ok(cmd) => {
-//build command
+                //build command
                 let mut command = Command::new(cmd);
 
-//add any args (if found)
+                //add any args (if found)
                 match table.get("args") {
                     Some(value) => match value.to_owned().into_array() {
                         Ok(args) => {
                             for arg in args {
                                 match arg.to_owned().into_str() {
                                     Ok(arg_str) => command.arg(arg_str),
-                                    Err(e) => return Err(format!("!!! - arg {} could not be converted into a string: {}", arg, e))
+                                    Err(e) => {
+                                        println!("!!! - arg {} could not be converted into a string: {}", arg, e);
+                                        &mut command
+                                    }
                                 };
                             }
                         }
-                        Err(e) => return Err(format!("!!! - \"args\" exists but its value is malformed (it should be an array): {}", e))
+                        Err(e) => println!("!!! - \"args\" exists but its value is malformed (it should be an array): {}", e)
                     }
-                    None => return Err(format!("!!! - \"args\" key not found in table"))
+                    None => println!("!!! - \"args\" key not found in table")
                 }
 
 //and run
