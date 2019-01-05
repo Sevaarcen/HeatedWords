@@ -1,5 +1,7 @@
 # HeatedWords
-A Rust program for turning a search term into a wordlist (and maybe HashCat rules) for dictionary-based password attacks.
+A Rust program for turning a search term into a wordlist for dictionary-based password attacks. Using hashcat rules with the wordlist is recommended.
+
+Use my other program "Common Words Generator(https://github.com/Sevaarcen/CommonWordsGenerator)" to build blacklists for the search engines.
 
 ## Features
 * Concurrent IO for network operations
