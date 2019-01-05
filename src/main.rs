@@ -172,7 +172,6 @@ fn main() {
     println!("Done");
 
     println!("### - Joining arguments to config file for global access");
-    println!("Debug is {} before set", configuration::read_debug());
     match configuration::CONFIGURATION.write() {
         Ok(mut config) => {
             match config.merge(arg_config) {
@@ -182,7 +181,6 @@ fn main() {
         }
         Err(e) => panic!("Couldn't open configuration to write: {}", e)
     }
-    println!("Debug is {} after set", configuration::read_debug());
     println!("Done");
 
     // handle CLI arguments

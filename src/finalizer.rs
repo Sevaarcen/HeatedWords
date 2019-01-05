@@ -2,13 +2,15 @@ use super::configuration;
 
 use config::Value;
 
+use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::{BufReader, BufRead, Write};
 use std::process::Command;
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 
-const CHARACTER_LIMIT_MAX: usize = 12;//inclusive
+const CHARACTER_LIMIT_MAX: usize = 12;
+//inclusive
 const CHARACTER_LIMIT_MIN: usize = 6; //inclusive
 
 pub fn finish_link_vector(link_vector: Vec<String>) {
@@ -41,16 +43,54 @@ pub fn finish_wordlist(end_list: &mut Vec<String>) {
     println!("!!! - finalizing wordlist of length {}", end_list.len());
     end_list.retain(|s| s.len() <= CHARACTER_LIMIT_MAX && s.len() >= CHARACTER_LIMIT_MIN);
 
+    println!("### - Deduping list");
     // dedup
     for start in 0..end_list.len() {
         let mut end = start;
         while end < end_list.len() { //use a while loop rather than for since removing changes index
-            if start != end && end_list[start] == end_list[end] {
+            if start != end && end_list[start].eq_ignore_ascii_case(end_list[end].as_str()) {
                 end_list.remove(end);
             } else {
                 end += 1;
             }
         }
+    }
+
+    if configuration::read_debug() {
+        println!("### - Wordlist is now of length: {}", end_list.len());
+    }
+
+    println!("### - Removing blacklisted words");
+    match fs::read_dir("./blacklists/") {
+        Ok(contents) => {
+            for entry in contents {
+                let path = entry.unwrap().path();
+                let filename = path.to_str().unwrap();
+                match File::open(filename) {
+                    Ok(blacklist_file) => {
+                        if configuration::read_debug() {
+                            println!("### - Using blacklist from path: {}", filename);
+                        }
+                        let reader = BufReader::new(blacklist_file);
+
+                        for line in reader.lines() {
+                            let entry = line.unwrap();
+                            let mut index: usize = 0;
+
+                            while index < end_list.len() {
+                                if entry.eq_ignore_ascii_case(end_list[index].as_str()) {
+                                    end_list.remove(index);
+                                    break; //because the list doesn't have duplicates we can break
+                                }
+                                index += 1;
+                            }
+                        }
+                    },
+                    Err(e) => println!("!!! - Blacklist file could not be opened: {}", e)
+                }
+            }
+        }
+        Err(_) => println!("!!! - Directory \"./blacklists/\" is missing")
     }
 
     println!("$$$ - wordlist was finalized to length {}", end_list.len());
@@ -62,6 +102,7 @@ pub fn finish_wordlist(end_list: &mut Vec<String>) {
                 Ok(value) => {
                     match File::create(&value) {
                         Ok(mut file) => {
+                            println!("Writing list of length: {}", end_list.len());
                             for word in end_list {
                                 match write!(file, "{}\n", word) {
                                     Ok(_) => (),
@@ -69,14 +110,16 @@ pub fn finish_wordlist(end_list: &mut Vec<String>) {
                                 }
                             }
                         }
-                        Err(e) => println!("!!! - Could not create/write to file \"{}\": {}", value, e)
+                        Err(e) => println!("!!! - Could not create file \"{}\": {}", value, e)
                     }
                 }
-                Err(_) => println!("The \"wordlist\" key is missing from the \"filenames\" table in config.toml.\
-                The word list won't be processed into a file... which kinda defeats the purpose of running this program")
+                Err(_) => println!("The \"wordlist\" key is missing \
+                from the \"filenames\" table in config.toml.\
+                The word list won't be processed into a file... \
+                which kinda defeats the purpose of running this program")
             }
         }
-        Err(e) => println!("Could not read config and finalize link vector handling: {}", e)
+        Err(e) => println!("Could not read config and finalize wordlist handling: {}", e)
     }
 }
 
@@ -118,10 +161,10 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
     match table.get("command") {
         Some(value) => match value.to_owned().into_str() {
             Ok(cmd) => {
-                //build command
+//build command
                 let mut command = Command::new(cmd);
 
-                //add any args (if found)
+//add any args (if found)
                 match table.get("args") {
                     Some(value) => match value.to_owned().into_array() {
                         Ok(args) => {
@@ -137,7 +180,7 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
                     None => return Err(format!("!!! - \"args\" key not found in table"))
                 }
 
-                //and run
+//and run
                 match command.output() {
                     Ok(output) => {
                         match String::from_utf8(output.stdout) {

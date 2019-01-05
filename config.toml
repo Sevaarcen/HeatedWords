@@ -27,12 +27,18 @@ wordlist = "wordlist.txt"
     command = "cmd"
     args = ["/C", "echo Hello there from post-processing as defined in config.toml!"]
 
-    [post-processing.malformed1] #this suceeds because "description" is optional
-    desc = "bad desc"
-    command = "cmd"
-    args = ["/C", "echo", "malformed commands might still work!"]
+    [post-processing.pwd]
+    description = "print working directory"
+    command = "pwd"
 
-    [post-processing.malformed2] #this fails
-    description = "bad boii!!!!"
-    command = "ljkaibesfkljhbwaekjfhbakj"
-    args = []
+    #this suceeds because "description" is optional
+    #[post-processing.malformed1]
+    #desc = "bad desc"
+    #command = "cmd"
+    #args = ["/C", "echo", "malformed commands might still work!"]
+
+    #this would fail outright
+    #[post-processing.malformed2] #this fails
+    #description = "bad boii!!!!"
+    #command = "ljkaibesfkljhbwaekjfhbakj"
+    #args = []

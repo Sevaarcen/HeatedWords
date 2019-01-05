@@ -39,19 +39,20 @@ fn find_critical_words(response_text: &String) -> Vec<String> {
 }
 
 fn get_all_slices(vector: &Vec<String>) -> Vec<String> {
-    let mut perms: Vec<String> = Vec::new();
+    let mut slices: Vec<String> = Vec::new();
 
     for begin in 0..vector.len() {
         for end in begin..vector.len() { //vector.len()
-            let mut perm = String::new();
+            let mut slice = String::new();
             for value in &vector[begin..end + 1] { //end+1 so it includes the end
-                perm = format!("{} {}", perm, *value)
+                slice = format!("{} {}", slice, *value);
+                slice = slice.trim().to_string();
             }
-            perms.push(perm.to_string().clone());
+            slices.push(slice.to_string().clone());
         }
     }
 
-    perms
+    slices
 }
 
 fn extract_words(text: &String) -> Vec<String> {
