@@ -6,6 +6,11 @@ max_links = 6 #max links returned by each engine. -1 for unlimited
 match_threshold = 0.60 # N percent of the words in the query should match the link
 extra_threshold = 0.80 # max N percent of the words in the link that doesn't match any word in the query
 word_bypass_limit = 2 # If the number of words in the page URL is less than to the number of words in the query and less than/equal this, it will bypass the QA check
+# ignore any of these patterns (regex) that occur in the URL (minus domain) when performing the QA check
+ignore_link_patterns = [
+    "wiki",
+    "%[0-9]{2}"
+]
 
 [filenames]
 links = "links.txt"

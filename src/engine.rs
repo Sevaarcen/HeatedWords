@@ -161,26 +161,64 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
         Ok(value) => value,
         Err(_) => Vec::new()
     };
+    let ignored_patterns_list = match
+        configuration::CONFIGURATION
+            .read()
+            .unwrap()
+            .get_array("sensitivity.ignore_link_patterns") {
+        Ok(array) => array.iter().map(|value| {
+            let value_copy = value.clone();
+            match value_copy.into_str() {
+                Ok(string) => {
+                    match Regex::new(string.as_str()) {
+                        Ok(regex) => regex,
+                        Err(e) => {
+                            println!("!!! - ignore_link_pattern isn't valid regex: {}", e);
+                            Regex::new("").unwrap()
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("!!! - ignore_link_pattern isn't a valid string: {}", e);
+                    Regex::new("").unwrap()
+                }
+            }
+        }).collect(),
+        Err(_) => {
+            println!("!!! - The key \"ignore_link_patterns\" doesn't exist in the sensitivity table. Ignoring...");
+            Vec::new()
+        }
+    };
 
 
     links.retain(|link| {
+        if configuration::read_debug() {
+            println!("### - Original link {:?} before ignoring patterns", link);
+        }
+
         let query_word_count = alphanumeric_rex.captures_iter(query).count();
-        let page_word_count = match page_rex.captures(link.as_str()) {
+        let path_word_count = match page_rex.captures(link.as_str()) {
             Some(page_cap) => {
-                alphanumeric_rex
-                    .captures_iter(page_cap.name("page").unwrap().as_str())
-                    .count()
-            },
+                let mut path = page_cap.name("page").unwrap().as_str().to_string();
+
+                //filter out ignored words before counting them
+                for pattern in &ignored_patterns_list {
+                    path = pattern.replace_all(path.as_str(), "").to_string();
+                }
+
+                alphanumeric_rex.captures_iter(path.as_str()).count()
+            }
             None => 0
         };
 
         //check to see if the counts should cause a bypass
         //bypass if the page doesn't have a path
-        if page_word_count == 0 {
+        if path_word_count == 0 {
             if configuration::read_debug() {
-                println!("### - {} bypassed QA due to not having a page name", link);
+                println!("### - {} bypassed QA due to not having a path after ignored patterns"
+                         , link);
             }
-            return true //assume if the page doesn't have a name its a dedicate site (good)
+            return true; //assume if the page doesn't have a name its a dedicate site (good)
         }
 
         let bypass_limit =
@@ -197,9 +235,10 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             println!("### -Using word bypass limit of: {}", bypass_limit);
         }
         //check if link should be bypassed due to low word count
-        if page_word_count <= bypass_limit && page_word_count < query_word_count {
+        if path_word_count <= bypass_limit && path_word_count < query_word_count {
             if configuration::read_debug() {
-                println!("### -{:?} bypassed QA due to the word requirement", link);
+                println!("### -{:?} bypassed QA due to the word requirement after ignored patterns"
+                         , link);
             }
             return true;
         }
@@ -207,25 +246,34 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
         //since length was checked beforehand, we guarantee that unwrapping it is safe
         let link_path = page_rex.captures(link.as_str()).unwrap().name("page").unwrap().as_str();
 
+        //run the ignore again on just the path for the domain
+        let mut path_after_ignore: String = link_path.clone().to_string();
+        for pattern in &ignored_patterns_list {
+            path_after_ignore =
+                pattern
+                    .replace_all(path_after_ignore.as_str(), "")
+                    .into_owned();
+        }
+
         if configuration::read_debug() {
-            println!("--- EVALUATING NEW LINK ---");
+            println!("--- PERFORMING QA CHECK ON LINK ---");
             println!("Link text: {:?}", link);
-            println!("Page text: {:?}", link_path);
+            println!("Actual Path: {:?}", link_path);
+            println!("Ignored patterns: {:?}", ignored_patterns_list);
+            println!("Path after ignored patterns: {:?}", path_after_ignore);
+            //TODO clean this up so the regex isn't done twice. Keep the arrays and then use them for the check
             println!("Words in query: {:?}",
                      alphanumeric_rex
                          .captures_iter(query)
                          .map(|cap| cap.get(0).unwrap().as_str().to_string())
                          .collect::<Vec<String>>());
+            println!("Words in path: {:?}",
+                     alphanumeric_rex
+                         .captures_iter(path_after_ignore.as_str())
+                         .map(|cap| cap.get(0).unwrap().as_str().to_string())
+                         .collect::<Vec<String>>());
             println!("Required words: {:?}", required_words);
-            let words_in_page = match page_rex.captures(link.as_str()) {
-                Some(page_cap) =>
-                    alphanumeric_rex
-                        .captures_iter(page_cap.name("page").unwrap().as_str())
-                        .map(|cap| cap.get(0).unwrap().as_str().to_string())
-                        .collect::<Vec<String>>(),
-                None => return true //assume if the page doesn't have a name its a good match
-            };
-            println!("Words in link page: {:?}", words_in_page);
+
         }
 
         //make sure link contains required words
@@ -233,7 +281,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             match required.into_str() {
                 Ok(string) => {
                     //if required word isn't in link
-                    if !link_path.to_lowercase().as_str().contains(string.to_lowercase().as_str()) {
+                    if !path_after_ignore.to_lowercase().contains(string.to_lowercase().as_str()) {
                         return false; //returns to retains method call up top
                     }
                 }
@@ -271,31 +319,30 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             not_match_counter += 1;
         }
 
-        let query_word_count = alphanumeric_rex.captures_iter(query).count();
-        let link_word_count = alphanumeric_rex.captures_iter(link_path).count();
-
         let match_percent = if not_match_counter != 0 {
             match_counter as f64 / query_word_count as f64
         } else {
             1.00 as f64
         };
-        let extra_percent = (link_word_count - match_counter) as f64 / link_word_count as f64;
+        let extra_percent = (path_word_count - match_counter) as f64 / path_word_count as f64;
 
         if configuration::read_debug() {
             println!("Words in query: {}", query_word_count);
-            println!("Words in link: {}", link_word_count);
+            println!("Words in path: {}", path_word_count);
             println!("Matched words: {}", match_counter);
             println!("Unmatched words: {}", not_match_counter);
-            println!("Ratio of match: {}", match_percent);
-            println!("Ratio of words in link that don't match anything in query: {}", extra_percent);
-            println!("Sensitivity ratios in use M:{} E:{}", min_match_threshold, max_extra_threshold);
+            println!("Ratio of match: {:.2} (min allowed is {:.2})", match_percent, min_match_threshold);
+            println!("Ratio of extra words: {:.2} (max allowed is {:.2})", extra_percent, max_extra_threshold);
         }
 
         if match_percent >= min_match_threshold && extra_percent <= max_extra_threshold {
+            if configuration::read_debug() {
+                println!("Verdict: PASS - {:?}", link);
+            }
             true
         } else {
             if configuration::read_debug() {
-                println!("Link doesn't match quality criteria: {:?}", link);
+                println!("Verdict: FAIL - {:?}", link);
             }
             false
         }
