@@ -1,6 +1,6 @@
 [package]
 name = "heated_words"
-version = "0.6.4"
+version = "0.6.5"
 authors = ["Sevaarcen <coleipod@gmail.com>"]
 edition = "2018"
 

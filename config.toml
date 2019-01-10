@@ -1,4 +1,6 @@
 debug = false
+minimum_word_length = 6 #inclusive minimum limit
+maximum_word_length = 14 #inclusive maximum limit
 
 # settings to change what links are processed for the wordlist
 [sensitivity]

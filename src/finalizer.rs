@@ -9,10 +9,6 @@ use std::process::Command;
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 
-const CHARACTER_LIMIT_MAX: usize = 12;
-//inclusive
-const CHARACTER_LIMIT_MIN: usize = 6; //inclusive
-
 pub fn finish_link_vector(link_vector: Vec<String>) {
     println!("!!! - finalizing link list of length {}", link_vector.len());
     match configuration::CONFIGURATION.read() {
@@ -40,8 +36,27 @@ pub fn finish_link_vector(link_vector: Vec<String>) {
 }
 
 pub fn finish_wordlist(end_list: &mut Vec<String>) {
+    let minimum_word_length
+        = match configuration::CONFIGURATION.read().unwrap().get_int("minimum_word_length") {
+        Ok(value) => value as usize,
+        Err(_) => {
+            println!("!!! - \"minimum_word_length\" key missing from configuration. \
+                Defaulting to 6");
+            6 as usize
+        }
+    };
+    let maximum_word_length
+        = match configuration::CONFIGURATION.read().unwrap().get_int("maximum_word_length") {
+        Ok(value) => value as usize,
+        Err(_) => {
+            println!("!!! - \"maximum_word_length\" key missing from configuration. \
+                Defaulting to 12");
+            12 as usize
+        }
+    };
+
     println!("!!! - finalizing wordlist of length {}", end_list.len());
-    end_list.retain(|s| s.len() <= CHARACTER_LIMIT_MAX && s.len() >= CHARACTER_LIMIT_MIN);
+    end_list.retain(|s| s.len() <= maximum_word_length && s.len() >= minimum_word_length);
 
     println!("### - Deduping list");
     // dedup
@@ -85,7 +100,7 @@ pub fn finish_wordlist(end_list: &mut Vec<String>) {
                                 index += 1;
                             }
                         }
-                    },
+                    }
                     Err(e) => println!("!!! - Blacklist file could not be opened: {}", e)
                 }
             }
@@ -183,7 +198,7 @@ fn run_process(table: HashMap<String, Value, RandomState>) -> Result<String, Str
                     None => println!("!!! - \"args\" key not found in table")
                 }
 
-//and run
+                //run and get output, direct to stdout
                 match command.output() {
                     Ok(output) => {
                         match String::from_utf8(output.stdout) {
