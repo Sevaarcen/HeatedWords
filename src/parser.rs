@@ -3,11 +3,11 @@ use regex::Regex;
 pub fn parse(response_text: &mut String) -> (Vec<String>, Vec<String>) {
 
     //removes junk text
-    remove_scripts(response_text); //JavaScript elements
-    remove_style(response_text); //CSS
-    remove_html_nodes(response_text); //HTML nodes
-    remove_html_text(response_text); //HTML encoded text (e.g. "&nbsp;")
-    remove_numbers(response_text); //any numbers
+    remove_scripts(response_text); // remove JavaScript elements
+    remove_style(response_text); // remove CSS
+    remove_html_nodes(response_text); // remove HTML nodes
+    remove_html_text(response_text); // remove HTML encoded text (e.g. "&nbsp;")
+    remove_numbers(response_text); // remove any numbers
 
     let critical = gather_critical_words(response_text);
     let extracted = extract_words(response_text);
@@ -16,6 +16,7 @@ pub fn parse(response_text: &mut String) -> (Vec<String>, Vec<String>) {
     (critical, extracted)
 }
 
+// 'critical words' are things like pronouns or important nouns that are likely to be passwords
 fn gather_critical_words(response_text: &String) -> Vec<String> {
     let cap_rex = Regex::new(r"(?P<cap>(?:[A-Z][\w]*)(?:[ \-]?[A-Z][\w]*)*)").unwrap();
 
@@ -51,21 +52,24 @@ fn get_powerset_of_vector(vector: &Vec<String>) -> Vec<String> {
     let length = vector.len();
     let mut result = Vec::new();
 
-
-    for setnum in 0..1<<length { //bit shift for ^2 to the length
+    for setnum in 0..1<<length { // bit shift for ^2 of the length to get correct size of powerset
+        // create the list for the individual powerset
         let mut set = Vec::new();
+        // build each possible element
         for index in 0..setnum {
             if setnum & (1<<index) > 0 {
                 set.push(vector[index].clone());
             }
         }
-        //build the set into a single value to return in the result
+        // flatten the powerset and join it into the vector of all powersets
         let mut flattened_set = String::new();
         for value in set {
             flattened_set = format!("{} {}", flattened_set, value);
         }
         result.push(flattened_set.trim().to_string());
     }
+
+    // return the list of powerset elements
     result
 }
 
@@ -94,6 +98,10 @@ fn remove_html_nodes(text: &mut String) {
 }
 
 fn remove_html_text(text: &mut String) {
+    // replace non-breaking spaces with actual spaces
+    *text = text.replace("&nbsp;", " ");
+
+    // just remove all other html characters
     let rex = Regex::new(r"&.*?;").unwrap();
     *text = rex.replace_all(text, "").to_string();
 }

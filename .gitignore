@@ -1,5 +1,13 @@
+# IDEA IDE files
 .idea/
+
+# Build files
 /target/
 Cargo.lock
-/*.txt
+
+# auto-generated backup files
 **/*.rs.bk
+
+# Local debug/output filetypes
+/*.txt
+/*.html

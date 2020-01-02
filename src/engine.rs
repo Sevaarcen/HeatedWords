@@ -9,12 +9,10 @@ use url::Url;
 
 use super::configuration;
 
-const LINK_REX: &str = r#"(?P<link>[\S\s]+?)"#;
-
 #[derive(Clone, Debug)]
 pub struct Engine {
     base_url: Url,
-    link_regex: Regex,
+    link_regex: Regex
 }
 
 impl fmt::Display for Engine {
@@ -28,7 +26,7 @@ impl Engine {
         Engine {
             base_url: Url::parse(base_url.as_str()).unwrap(),
             link_regex: Regex::new(
-                contents_pattern.replace("{}", LINK_REX).as_str()
+                contents_pattern.as_str()
             ).unwrap(),
         }
     }
@@ -40,7 +38,7 @@ impl Engine {
         };
         let query = query_as_string.as_str();
 
-        println!("### - {} dispatched with query: {}", self, query);
+        println!("###  {} dispatched with query: {}", self, query);
         let encoded_query = utf8_percent_encode(query, DEFAULT_ENCODE_SET).to_string();
         let url = self.base_url.as_str().replace("{}", encoded_query.as_str());
 
@@ -60,7 +58,7 @@ impl Engine {
                         match config.get_int("sensitivity.max_links") {
                             Ok(max) =>
                                 if max != -1 && max as usize <= links.len() {
-                                    println!("### - {} received {} links but will only return the first {}", self, links.len(), max);
+                                    println!("###  {} received {} links but will only return the first {}", self, links.len(), max);
                                     max as usize
                                 } else {
                                     links.len()
@@ -79,24 +77,55 @@ impl Engine {
 
     //runs actual search via search engine
     fn generate_links(&self, url: &str) -> Result<Vec<String>, String> {
-        match reqwest::get(url) {
-            Ok(mut response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.text() {
-                        Ok(text) => {
-                            if configuration::read_debug() {
-                                println!("\n\n\n{}\n\n\n", text);
-                            }
-                            Ok(self.extract_links(text))
-                        }
-                        Err(e) => Err(format!("!!! - {} encountered an error: {}", self, e))
-                    }
-                } else {
-                    Err(format!("!!! - Engine failed to GET \"{}\" due to receiving status code {}", url, response.status()))
-                }
-            }
-            Err(e) => Err(format!("!!! - {} failed to GET its URL \"{}\": {}", self, url, e))
+
+        // grab user-agent to impersonate from configuration file
+        let user_agent_string = match configuration::CONFIGURATION.read().unwrap().get_str("user-agent") {
+            Ok(result) => result.clone(),
+            Err(e) => panic!("Could not read user-agent from configuration: {}", e)
+        };
+
+        // build request client that uses blocking IO and the specified user-agent
+        let request_client = match reqwest::blocking::Client::builder()
+            .user_agent(user_agent_string)
+            .build() {
+                Ok(client) => {
+                    client
+                },
+                Err(e) => panic!("Could not create Engine Client: {}", e)
+            };
+        
+        if configuration::read_debug() {
+            println!("~~~  {} has finished building the request client", self);
         }
+
+        // actually make the request
+        let response = match request_client.get(url).send() {
+            Ok(resp) => resp,
+            Err(e) => return Err(format!("!!!  {} failed to make request due to error: {}", self, e))
+        };
+
+        // check if the status code is a 2XX
+        if response.status() != reqwest::StatusCode::OK {
+            return Err(format!("!!!  {} made request but received status code '{}'", self, response.status()))
+        }
+
+        if configuration::read_debug() {
+            println!("~~~  {} has finished making the request to '{}'", self, url);
+        }
+
+        // get the response text (html webpage)
+        let response_text = match response.text() {
+            Ok(text) => text,
+            Err(e) => return Err(format!("!!!  {} could not retrieve text from response due to error: {}", self, e))
+        };
+
+        if configuration::read_debug() {
+            println!("~~~  {} has received the response text", self);
+            println!("\n\n\n{}\n\n\n", response_text);
+        }
+
+        // extract the links to each page from the HTML
+        Ok(self.extract_links(response_text))  // return the vector of absolute URLs
     }
 
     //returns a vector of the URLs
@@ -130,7 +159,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             .get_float("sensitivity.match_threshold") {
         Ok(value) => value,
         Err(_) => {
-            println!("!!! - Could not read value of \"sensitivity.match_threshhold\". Defaulting to 0.00");
+            println!("!!!  Could not read value of \"sensitivity.match_threshhold\". Defaulting to 0.00");
             0.00
         }
     };
@@ -141,7 +170,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
             .get_float("sensitivity.extra_threshold") {
         Ok(value) => value,
         Err(_) => {
-            println!("!!! - Could not read value of \"sensitivity.extra_threshold\". Defaulting to 1.00");
+            println!("!!!  Could not read value of \"sensitivity.extra_threshold\". Defaulting to 1.00");
             1.00
         }
     };
@@ -173,19 +202,19 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
                     match Regex::new(string.as_str()) {
                         Ok(regex) => regex,
                         Err(e) => {
-                            println!("!!! - ignore_link_pattern isn't valid regex: {}", e);
+                            println!("!!!  ignore_link_pattern isn't valid regex: {}", e);
                             Regex::new("").unwrap()
                         }
                     }
                 }
                 Err(e) => {
-                    println!("!!! - ignore_link_pattern isn't a valid string: {}", e);
+                    println!("!!!  ignore_link_pattern isn't a valid string: {}", e);
                     Regex::new("").unwrap()
                 }
             }
         }).collect(),
         Err(_) => {
-            println!("!!! - The key \"ignore_link_patterns\" doesn't exist in the sensitivity table. Ignoring...");
+            println!("!!!  The key \"ignore_link_patterns\" doesn't exist in the sensitivity table. Ignoring...");
             Vec::new()
         }
     };
@@ -193,7 +222,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
 
     links.retain(|link| {
         if configuration::read_debug() {
-            println!("### - Original link {:?} before ignoring patterns", link);
+            println!("###  Original link {:?} before ignoring patterns", link);
         }
 
         let query_word_count = alphanumeric_rex.captures_iter(query).count();
@@ -215,7 +244,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
         //bypass if the page doesn't have a path
         if path_word_count == 0 {
             if configuration::read_debug() {
-                println!("### - {} bypassed QA due to not having a path after ignored patterns"
+                println!("###  {} bypassed QA due to not having a path after ignored patterns"
                          , link);
             }
             return true; //assume if the page doesn't have a name its a dedicate site (good)
@@ -227,7 +256,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
                 .get_int("sensitivity.word_bypass_limit") {
                 Ok(value) => value as usize,
                 Err(_) => {
-                    println!("!!! - No word bypass limit specified, defaulting to 0");
+                    println!("!!!  No word bypass limit specified, defaulting to 0");
                     0
                 }
             };
@@ -285,7 +314,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
                         return false; //returns to retains method call up top
                     }
                 }
-                Err(e) => println!("!!! - malformed required word isn't a string: {}", e)
+                Err(e) => println!("!!!  malformed required word isn't a string: {}", e)
             }
         }
 
@@ -298,7 +327,7 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
                         return false; //returns to retains method call up top
                     }
                 }
-                Err(e) => println!("!!! - malformed excluded word isn't a string: {}", e)
+                Err(e) => println!("!!!  malformed excluded word isn't a string: {}", e)
             }
         }
 
@@ -337,12 +366,12 @@ fn filter_links(links: &mut Vec<String>, query: &str) {
 
         if match_percent >= min_match_threshold && extra_percent <= max_extra_threshold {
             if configuration::read_debug() {
-                println!("Verdict: PASS - {:?}", link);
+                println!("Verdict: PASS  {:?}", link);
             }
             true
         } else {
             if configuration::read_debug() {
-                println!("Verdict: FAIL - {:?}", link);
+                println!("Verdict: FAIL  {:?}", link);
             }
             false
         }
@@ -369,13 +398,13 @@ pub fn build_engines() -> Vec<Engine> {
                             );
                         }
                 }
-                Err(_) => panic!("!!! - The \"engines\" table and its relevant sub-tables are missing from the configuration.")
+                Err(_) => panic!("!!!  The \"engines\" table and its relevant sub-tables are missing from the configuration.")
             }
         }
-        Err(e) => panic!("!!! - Configuration could not be read : {}", e)
+        Err(e) => panic!("!!!  Configuration could not be read : {}", e)
     }
 
-    println!("$$$ - Successfully built {} search Engines", engines.len());
+    println!("$$$  Successfully built {} search Engines", engines.len());
 
     engines
 }

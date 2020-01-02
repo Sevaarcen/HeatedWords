@@ -25,7 +25,8 @@ use std::io::{BufReader, BufRead};
 fn main() {
     println!("-=<|[[[ HEATED WORDS STARTED ]]]|>=-");
 
-    println!("### - Gathering arguments");
+    // gathering CLI arguments
+    println!("###  Gathering arguments");
     let arguments =
         App::new("Heated Words")
             .arg(Arg::with_name("QUERY MODE")
@@ -105,14 +106,15 @@ fn main() {
             )
             .get_matches();
 
+    // loading configuration file
     let config_filename = arguments
         .value_of("configuration file")
         .unwrap_or("config.toml");
-    println!("### - Loading configuration file: {}", config_filename);
+    println!("###  Loading configuration file: {}", config_filename);
     configuration::load_configuration_file(config_filename);
-    println!("Done");
 
-    print!("### - Building configuration from arguments");
+    // turning CLI arguments into "Config" object
+    println!("###  Building configuration from arguments");
     let mut arg_config = Config::new();
 
     let search_query = arguments.value_of("QUERY MODE").unwrap_or("");
@@ -154,7 +156,7 @@ fn main() {
                     arg_config.set("sensitivity.max_links", count).unwrap();
                 }
                 Err(e) => println!("!!! Match Ratio threshold is an invalid integer.\
-                Program will fall back to config file: {}", e)
+                    Program will fall back to config file: {}", e)
             }
         }
         None => ()
@@ -166,7 +168,7 @@ fn main() {
                     arg_config.set("sensitivity.word_bypass_limit", count).unwrap();
                 }
                 Err(e) => println!("!!! Match Ratio threshold is an invalid float.\
-                Program will fall back to config file: {}", e)
+                    Program will fall back to config file: {}", e)
             }
         }
         None => ()
@@ -177,8 +179,8 @@ fn main() {
                 Ok(threshold) => {
                     arg_config.set("sensitivity.match_threshold", threshold).unwrap();
                 }
-                Err(e) => println!("!!! Match Ratio threshold is an invalid float.\
-                Program will fall back to config file: {}", e)
+                Err(e) => println!("!!!  Match Ratio threshold is an invalid float.\
+                    Program will fall back to config file: {}", e)
             }
         }
         None => ()
@@ -190,13 +192,14 @@ fn main() {
                     arg_config.set("sensitivity.extra_threshold", threshold).unwrap();
                 }
                 Err(e) => println!("!!! Extra Ratio threshold is an invalid float.\
-                Program will fall back to config file: {}", e)
+                    Program will fall back to config file: {}", e)
             }
         }
         None => ()
     }
 
-    println!("### - Joining arguments to config file for global access");
+    // joining arguments "Config" object with the config file. The arguments override the file
+    println!("###  Joining arguments to config file for global access");
     match configuration::CONFIGURATION.write() {
         Ok(mut config) => {
             match config.merge(arg_config) {
@@ -207,25 +210,29 @@ fn main() {
         Err(e) => panic!("Couldn't open configuration to write: {}", e)
     }
 
+
+    // create Vector with thread safety to hold list of URLs to retrieve
     let complete_link_list = Arc::new(Mutex::new(Vec::new()));
 
-    //run QUERY mode
+    //run QUERY mode if specified
     if arguments.is_present("QUERY MODE") {
-        // handle CLI arguments
-        println!("### - Running program with query: \"{}\"", search_query);
+        // debug print query
+        println!("###  Running program with query: \"{}\"", search_query);
 
         //build search engines from config file that we loaded earlier
         let engines = engine::build_engines();
 
-        println!("### - Using the following search engines: ");
+        println!("###  Using the following search engines: ");
         for engine in &engines {
-            println!("{}", &engine);
+            println!("~~~   {}", &engine);
         }
 
 
+        // create Vector of engine threads to join later
         let mut running_engines = Vec::new();
 
-        println!("### - Dispatching engines...");
+        // spawn new threads for each engine and give them reference to shared complete_link_list
+        println!("###  Dispatching engines...");
         for engine in engines {
             let shared_list = Arc::clone(&complete_link_list);
             running_engines.push(thread::spawn(move || {
@@ -241,16 +248,21 @@ fn main() {
             }));
         }
 
-        //waits for them to complete
+        // wait for all engines to finish running
         for running in running_engines {
-            running.join().unwrap();
+            match running.join() {
+                Ok(_) => continue,
+                Err(_) => panic!("!!!  Failed to join thread running an Engine")
+            }
         }
-    } else if arguments.is_present("NO ENGINE MODE") {
-        println!("### - Running in no-engine mode with list: {}", url_list_filename);
+    } else if arguments.is_present("NO ENGINE MODE") {  // If instead of QUERY mode just use link file...
+        println!("###  Running in no-engine mode with list: {}", url_list_filename);
 
+        // get the shared list
         let shared_list = Arc::clone(&complete_link_list);
         let mut link_vector = shared_list.lock().unwrap();
 
+        // and copy the URLs from the file into the shared list
         let input_file = match File::open(url_list_filename) {
             Ok(file) => file,
             Err(e) => panic!("File cannot be opened: {}", e)
@@ -265,29 +277,33 @@ fn main() {
     }
 
 
-    //then gives the resulting list to the Spider
+    //then gives the resulting list to the Spider (Fetcher manager)
     match complete_link_list.to_owned().lock() {
         Ok(list) => {
-            println!("$$$ - Collected {} links in total", list.len());
+            println!("$$$  Collected {} links in total", list.len());
             if configuration::read_debug() {
                 for link in list.iter() {
                     println!("L: {}", link);
                 }
             }
 
+            // create Spider with a list of URLs which it needs to retrieve
             let mut spider = spider::Spider::new(list.to_vec());
-            println!("### - Dispatching spider...");
+            println!("###  Dispatching spider...");
+            // dispatch hands execution of program to spider which will eventually return a Vec<String> of each word the fetchers retrieved
             let mut results: Vec<String> = spider.dispatch();
 
 
-            println!("### - Finalizing results...");
+            println!("###  Finalizing results");
+            println!("~~~  finalizing link list of length {}", list.to_vec().len());
             finalizer::finish_link_vector(list.to_vec());
+            println!("~~~  finalizing wordlist of length {}", results.len());
             finalizer::finish_wordlist(&mut results);
 
-            println!("### - Executing post-processing...");
-            finalizer::run_post_processing();
+            println!("###  Executing post-processing");
+            finalizer::run_post_processing();  // Run scripts/commands/etc as specified in configuration file
 
-            println!("-=<|[[[ HEATED WORDS COMPLETED ]]]|>=-");
+            println!("--=<{{[[[  HEATED WORDS COMPLETED  ]]]}}>=--");
         }
         Err(e) => panic!("{}", e)
     }
